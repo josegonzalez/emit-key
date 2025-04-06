@@ -50,6 +50,32 @@ Example:
 sudo ./emit-key -k a  # Emits an 'a' key press
 ```
 
+The `<key_name>` can also be a comma-delimited set of keys to press in order:
+
+```bash
+sudo ./emit-key -k p,9,f5,p
+```
+
+### Custom Sleep Durations
+
+You can specify custom sleep durations (in microseconds) between key presses using a colon separator:
+
+```bash
+sudo ./emit-key -k p,9,f5:500000,p
+```
+
+This will:
+
+1. Press 'p'
+2. Sleep 100000 microseconds (default)
+3. Press '9'
+4. Sleep 100000 microseconds (default)
+5. Press 'F5'
+6. Sleep 500000 microseconds (custom duration)
+7. Press 'p'
+
+The default sleep duration between key presses is 100000 microseconds (0.1 seconds). You can override this by specifying a custom duration after any key using the `:duration` syntax.
+
 ### Signal Mode
 
 Run the program in signal mode to wait for SIGUSR1 before emitting the key:
