@@ -1,2 +1,5 @@
 minui
+include
+lib
+platform
 emit-key-*
