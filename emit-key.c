@@ -9,8 +9,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <time.h>
 
-// Key mapping structure
 struct key_mapping
 {
     const char *name;
@@ -18,9 +18,16 @@ struct key_mapping
 };
 
 int fd;
-unsigned long key_code;
 
-// Key mapping table
+struct key_press
+{
+    unsigned long code;
+    unsigned long sleep_us;
+};
+
+struct key_press *key_presses = NULL;
+size_t num_key_presses = 0;
+
 static const struct key_mapping key_map[] = {
     {"f1", KEY_F1},
     {"f2", KEY_F2},
@@ -73,7 +80,6 @@ static const struct key_mapping key_map[] = {
     {NULL, 0} // Sentinel
 };
 
-// Function to get key code from name
 unsigned long get_key_code(const char *key_name)
 {
     char *lower_key = strdup(key_name);
@@ -83,7 +89,6 @@ unsigned long get_key_code(const char *key_name)
         exit(1);
     }
 
-    // Convert to lowercase
     for (char *p = lower_key; *p; p++)
     {
         *p = tolower(*p);
@@ -126,6 +131,7 @@ void emit(int fd, int type, int code, int val)
 
 void press_key(int fd, int key_code)
 {
+    printf("Pressing key: %d\n", key_code);
     emit(fd, EV_KEY, key_code, 1);
     emit(fd, EV_SYN, SYN_REPORT, 0);
     emit(fd, EV_KEY, key_code, 0);
@@ -144,7 +150,14 @@ void signal_handler(int signal)
     }
     else if (signal == SIGUSR1)
     {
-        press_key(fd, key_code);
+        for (size_t i = 0; i < num_key_presses; i++)
+        {
+            press_key(fd, key_presses[i].code);
+            if (i < num_key_presses - 1)
+            {
+                usleep(key_presses[i].sleep_us);
+            }
+        }
     }
     else
     {
@@ -154,7 +167,7 @@ void signal_handler(int signal)
 
 int main(int argc, char *argv[])
 {
-    const char *key_name = "F12";
+    const char *key_names = "F12";
     int opt;
     int wait_for_signal = 0;
     while ((opt = getopt(argc, argv, "k:s")) != -1)
@@ -162,23 +175,67 @@ int main(int argc, char *argv[])
         switch (opt)
         {
         case 'k':
-            key_name = optarg;
+            key_names = optarg;
             break;
         case 's':
             wait_for_signal = 1;
             break;
         default:
-            fprintf(stderr, "Usage: %s [-k key_name]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-k key_name[:sleep_us][,key_name2[:sleep_us2],...]]\n", argv[0]);
             exit(1);
         }
     }
 
     struct uinput_setup usetup;
     fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
-    key_code = get_key_code(key_name);
 
-    ioctl(fd, UI_SET_EVBIT, EV_KEY);
-    ioctl(fd, UI_SET_KEYBIT, key_code);
+    char *key_names_copy = strdup(key_names);
+    if (!key_names_copy)
+    {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        exit(1);
+    }
+
+    num_key_presses = 1;
+    for (char *p = key_names_copy; *p; p++)
+    {
+        if (*p == ',')
+            num_key_presses++;
+    }
+
+    key_presses = malloc(num_key_presses * sizeof(struct key_press));
+    if (!key_presses)
+    {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        free(key_names_copy);
+        exit(1);
+    }
+
+    char *token = strtok(key_names_copy, ",");
+    size_t i = 0;
+    while (token)
+    {
+        char *colon = strchr(token, ':');
+        if (colon)
+        {
+            *colon = '\0';
+            key_presses[i].sleep_us = strtoul(colon + 1, NULL, 10);
+        }
+        else
+        {
+            key_presses[i].sleep_us = 100000;
+        }
+
+        key_presses[i].code = get_key_code(token);
+
+        ioctl(fd, UI_SET_EVBIT, EV_KEY);
+        ioctl(fd, UI_SET_KEYBIT, key_presses[i].code);
+
+        token = strtok(NULL, ",");
+        i++;
+    }
+
+    free(key_names_copy);
 
     memset(&usetup, 0, sizeof(usetup));
     usetup.id.bustype = BUS_USB;
@@ -206,26 +263,23 @@ int main(int argc, char *argv[])
     }
     else
     {
-        /*
-         * On UI_DEV_CREATE the kernel will create the device node for this
-         * device. We are inserting a pause here so that userspace has time
-         * to detect, initialize the new device, and can start listening to
-         * the event, otherwise it will not notice the event we are about
-         * to send. This pause is only needed in our example code!
-         */
         sleep(1);
 
-        press_key(fd, key_code);
+        for (size_t i = 0; i < num_key_presses; i++)
+        {
+            press_key(fd, key_presses[i].code);
+            if (i < num_key_presses - 1)
+            {
+                usleep(key_presses[i].sleep_us);
+            }
+        }
     }
 
-    /*
-     * Give userspace some time to read the events before we destroy the
-     * device with UI_DEV_DESTOY.
-     */
     sleep(1);
 
     ioctl(fd, UI_DEV_DESTROY);
     close(fd);
+    free(key_presses);
 
     return 0;
 }
