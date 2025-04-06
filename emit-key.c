@@ -1,12 +1,13 @@
 #include <fcntl.h>
+#include <getopt.h>
 #include <linux/uinput.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <getopt.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 // Key mapping structure
 struct key_mapping
@@ -14,6 +15,9 @@ struct key_mapping
     const char *name;
     unsigned long code;
 };
+
+int fd;
+unsigned long key_code;
 
 // Key mapping table
 static const struct key_mapping key_map[] = {
@@ -61,18 +65,48 @@ void emit(int fd, int type, int code, int val)
     write(fd, &ie, sizeof(ie));
 }
 
+void press_key(int fd, int key_code)
+{
+    emit(fd, EV_KEY, key_code, 1);
+    emit(fd, EV_SYN, SYN_REPORT, 0);
+    emit(fd, EV_KEY, key_code, 0);
+    emit(fd, EV_SYN, SYN_REPORT, 0);
+}
+
+void signal_handler(int signal)
+{
+    if (signal == SIGINT)
+    {
+        exit(130);
+    }
+    else if (signal == SIGTERM)
+    {
+        exit(143);
+    }
+    else if (signal == SIGUSR1)
+    {
+        press_key(fd, key_code);
+    }
+    else
+    {
+        exit(1);
+    }
+}
+
 int main(int argc, char *argv[])
 {
-    const char *key_name = "F12"; // Default key
+    const char *key_name = "F12";
     int opt;
-
-    // Parse command line arguments
-    while ((opt = getopt(argc, argv, "k:")) != -1)
+    int wait_for_signal = 0;
+    while ((opt = getopt(argc, argv, "k:s")) != -1)
     {
         switch (opt)
         {
         case 'k':
             key_name = optarg;
+            break;
+        case 's':
+            wait_for_signal = 1;
             break;
         default:
             fprintf(stderr, "Usage: %s [-k key_name]\n", argv[0]);
@@ -81,39 +115,49 @@ int main(int argc, char *argv[])
     }
 
     struct uinput_setup usetup;
-    int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
-    unsigned long key_code = get_key_code(key_name);
+    fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    key_code = get_key_code(key_name);
 
-    /*
-     * The ioctls below will enable the device that is about to be
-     * created, to pass key events, in this case the space key.
-     */
     ioctl(fd, UI_SET_EVBIT, EV_KEY);
     ioctl(fd, UI_SET_KEYBIT, key_code);
 
     memset(&usetup, 0, sizeof(usetup));
     usetup.id.bustype = BUS_USB;
-    usetup.id.vendor = 0x1234;  /* sample vendor */
-    usetup.id.product = 0x5678; /* sample product */
-    strcpy(usetup.name, "Example device");
+    usetup.id.vendor = 0x1234;
+    usetup.id.product = 0x5678;
+    strcpy(usetup.name, "Emit key");
 
     ioctl(fd, UI_DEV_SETUP, &usetup);
     ioctl(fd, UI_DEV_CREATE);
 
-    /*
-     * On UI_DEV_CREATE the kernel will create the device node for this
-     * device. We are inserting a pause here so that userspace has time
-     * to detect, initialize the new device, and can start listening to
-     * the event, otherwise it will not notice the event we are about
-     * to send. This pause is only needed in our example code!
-     */
-    sleep(1);
+    struct sigaction sa = {
+        .sa_handler = signal_handler,
+        .sa_flags = SA_RESTART};
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGUSR1, &sa, NULL);
 
-    /* Key press, report the event, send key release, and report again */
-    emit(fd, EV_KEY, key_code, 1);
-    emit(fd, EV_SYN, SYN_REPORT, 0);
-    emit(fd, EV_KEY, key_code, 0);
-    emit(fd, EV_SYN, SYN_REPORT, 0);
+    if (wait_for_signal)
+    {
+        while (1)
+        {
+            sleep(1);
+        }
+    }
+    else
+    {
+        /*
+         * On UI_DEV_CREATE the kernel will create the device node for this
+         * device. We are inserting a pause here so that userspace has time
+         * to detect, initialize the new device, and can start listening to
+         * the event, otherwise it will not notice the event we are about
+         * to send. This pause is only needed in our example code!
+         */
+        sleep(1);
+
+        press_key(fd, key_code);
+    }
 
     /*
      * Give userspace some time to read the events before we destroy the
