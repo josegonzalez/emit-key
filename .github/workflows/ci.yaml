@@ -24,17 +24,17 @@ jobs:
       matrix:
         toolchain:
           # - gkdpixel deprecated, but also i386 only so it won't build without buildx
+          # none of the following platforms have the correct includes for UI_DEV_SETUP it seems
+          # - my282
+          # - rg35xx # (deprecated)
+          # - rg35xxplus
+          # - trimuismart # (deprecated)
           - m17 # (deprecated)
           - magicmini
           - miyoomini # (deprecated)
-          - my282
           - my355
-          - rg35xx # (deprecated)
-          - rg35xxplus
           - rgb30 # (deprecated)
-          # - tg3040 now merged with tg5040, so we can't build it separately
           - tg5040
-          - trimuismart # (deprecated)
           - zero28
 
     steps:
