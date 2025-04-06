@@ -77,6 +77,7 @@ static const struct key_mapping key_map[] = {
     {"7", KEY_7},
     {"8", KEY_8},
     {"9", KEY_9},
+    {"esc", KEY_ESC},
     {NULL, 0} // Sentinel
 };
 

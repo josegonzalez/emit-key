@@ -43,6 +43,7 @@ Where `<key_name>` can be:
 - Any function key (F1-F12)
 - Any lowercase letter (a-z)
 - Any number key (0-9)
+- The escape key
 
 Example:
 
