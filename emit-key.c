@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <ctype.h>
 
 // Key mapping structure
 struct key_mapping
@@ -21,18 +22,18 @@ unsigned long key_code;
 
 // Key mapping table
 static const struct key_mapping key_map[] = {
-    {"F1", KEY_F1},
-    {"F2", KEY_F2},
-    {"F3", KEY_F3},
-    {"F4", KEY_F4},
-    {"F5", KEY_F5},
-    {"F6", KEY_F6},
-    {"F7", KEY_F7},
-    {"F8", KEY_F8},
-    {"F9", KEY_F9},
-    {"F10", KEY_F10},
-    {"F11", KEY_F11},
-    {"F12", KEY_F12},
+    {"f1", KEY_F1},
+    {"f2", KEY_F2},
+    {"f3", KEY_F3},
+    {"f4", KEY_F4},
+    {"f5", KEY_F5},
+    {"f6", KEY_F6},
+    {"f7", KEY_F7},
+    {"f8", KEY_F8},
+    {"f9", KEY_F9},
+    {"f10", KEY_F10},
+    {"f11", KEY_F11},
+    {"f12", KEY_F12},
     {"a", KEY_A},
     {"b", KEY_B},
     {"c", KEY_C},
@@ -59,21 +60,54 @@ static const struct key_mapping key_map[] = {
     {"x", KEY_X},
     {"y", KEY_Y},
     {"z", KEY_Z},
+    {"0", KEY_0},
+    {"1", KEY_1},
+    {"2", KEY_2},
+    {"3", KEY_3},
+    {"4", KEY_4},
+    {"5", KEY_5},
+    {"6", KEY_6},
+    {"7", KEY_7},
+    {"8", KEY_8},
+    {"9", KEY_9},
     {NULL, 0} // Sentinel
 };
 
 // Function to get key code from name
 unsigned long get_key_code(const char *key_name)
 {
+    char *lower_key = strdup(key_name);
+    if (!lower_key)
+    {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        exit(1);
+    }
+
+    // Convert to lowercase
+    for (char *p = lower_key; *p; p++)
+    {
+        *p = tolower(*p);
+    }
+
+    unsigned long code = 0;
     for (const struct key_mapping *mapping = key_map; mapping->name != NULL; mapping++)
     {
-        if (strcasecmp(key_name, mapping->name) == 0)
+        if (strcmp(lower_key, mapping->name) == 0)
         {
-            return mapping->code;
+            code = mapping->code;
+            break;
         }
     }
-    fprintf(stderr, "Error: Unknown key '%s'\n", key_name);
-    exit(1);
+
+    free(lower_key);
+
+    if (code == 0)
+    {
+        fprintf(stderr, "Error: Unknown key '%s'\n", key_name);
+        exit(1);
+    }
+
+    return code;
 }
 
 void emit(int fd, int type, int code, int val)
