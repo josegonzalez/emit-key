@@ -17,6 +17,12 @@ A Linux utility that creates a virtual input device and emits key presses progra
 
 ## Installation
 
+Each release publishes a build per MinUI toolchain, named `emit-key-<platform>`, and a statically linked build per architecture, named `emit-key-linux-arm` and `emit-key-linux-arm64`. The static builds run on any device of that architecture, including platforms that have no build of their own, such as `rg35xxplus`, `tg5050` and `h700`.
+
+To build the static binaries yourself, run `make static`. This needs Docker with `buildx`, and QEMU when building on a machine that is not ARM.
+
+To build from source for the device you are on:
+
 1. Clone the repository
 2. Compile the program:
 
@@ -95,6 +101,10 @@ kill -SIGUSR1 <pid>
 
 - `-k <key_name>`: Specify the key to emit (required)
 - `-s`: Run in signal mode (optional)
+
+## Exit Status
+
+`emit-key` exits with `0` once the keys have been sent, and with `1` when a key name is unknown, `/dev/uinput` cannot be opened, or the virtual input device cannot be created. In the last two cases no keys are sent.
 
 ## Signal Handling
 

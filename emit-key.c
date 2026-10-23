@@ -120,12 +120,13 @@ void emit(int fd, int type, int code, int val)
 {
     struct input_event ie;
 
+    /* the timestamp is ignored, and zeroing the whole struct leaves it zero
+     * whether the libc names it time or splits it for 64-bit time on 32-bit
+     * targets */
+    memset(&ie, 0, sizeof(ie));
     ie.type = type;
     ie.code = code;
     ie.value = val;
-    /* timestamp values below are ignored */
-    ie.time.tv_sec = 0;
-    ie.time.tv_usec = 0;
 
     write(fd, &ie, sizeof(ie));
 }
@@ -189,6 +190,13 @@ int main(int argc, char *argv[])
 
     struct uinput_setup usetup;
     fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    if (fd < 0)
+    {
+        // without the device every key press below is a silent no-op, and a
+        // caller relying on the keys has to be able to tell
+        perror("Error: Unable to open /dev/uinput");
+        exit(1);
+    }
 
     char *key_names_copy = strdup(key_names);
     if (!key_names_copy)
@@ -245,7 +253,12 @@ int main(int argc, char *argv[])
     strcpy(usetup.name, "Emit key");
 
     ioctl(fd, UI_DEV_SETUP, &usetup);
-    ioctl(fd, UI_DEV_CREATE);
+    if (ioctl(fd, UI_DEV_CREATE) < 0)
+    {
+        perror("Error: Unable to create the virtual input device");
+        close(fd);
+        exit(1);
+    }
 
     struct sigaction sa = {
         .sa_handler = signal_handler,
