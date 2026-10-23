@@ -1,5 +1,8 @@
+# the static builds bring their own compiler, so only the toolchain builds need one
+ifneq (static,$(MAKECMDGOALS))
 ifeq (,$(CROSS_COMPILE))
 $(error missing CROSS_COMPILE for this toolchain)
+endif
 endif
 
 CURRENT_WORKING_DIR = $(shell pwd)
@@ -32,3 +35,8 @@ clean:
 
 minui:
 	git clone https://github.com/shauninman/MinUI minui
+
+static:
+	docker buildx build --target export --output "type=local,dest=." .
+
+.PHONY: static

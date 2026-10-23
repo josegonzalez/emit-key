@@ -89,10 +89,44 @@ jobs:
           name: ${{ steps.binary.outputs.filename }}
           path: ${{ steps.binary.outputs.filename }}
 
+  static:
+    name: static
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the application
+        run: make static
+
+      - name: Ensure the binaries exist
+        run: |
+          test -f emit-key-linux-arm
+          test -f emit-key-linux-arm64
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v2.1.0
+        with:
+          subject-path: "emit-key-linux-*"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: emit-key-linux
+          path: emit-key-linux-*
+
   release:
     name: release
     runs-on: ubuntu-24.04-arm
-    needs: ci
+    needs: [ci, static]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
