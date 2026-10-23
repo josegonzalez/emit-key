@@ -102,6 +102,10 @@ kill -SIGUSR1 <pid>
 - `-k <key_name>`: Specify the key to emit (required)
 - `-s`: Run in signal mode (optional)
 
+## Exit Status
+
+`emit-key` exits with `0` once the keys have been sent, and with `1` when a key name is unknown, `/dev/uinput` cannot be opened, or the virtual input device cannot be created. In the last two cases no keys are sent.
+
 ## Signal Handling
 
 The program handles the following signals:
